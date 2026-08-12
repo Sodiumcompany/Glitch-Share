@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glitchi Share – Send Files</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Unbounded:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    /* --- same as before, plus fixes --- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --c1: #ff2d78; --c2: #00f5d4; --c3: #ffe600; --c4: #9b5de5;
+      --c5: #00bbf9; --c6: #f15bb5; --dark: #0a0a0f; --dark2: #12121e;
+      --dark3: #1c1c2e; --glass: rgba(255,255,255,0.05); --glass2: rgba(255,255,255,0.08);
+    }
+    body { font-family: 'Space Grotesk', sans-serif; background: var(--dark); color: #fff; min-height: 100vh; overflow-x: hidden; }
+    .bg-canvas { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(80px); animation: floatOrb linear infinite; opacity: 0.35; }
+    @keyframes floatOrb { 0% { transform: translate(0,0) scale(1); } 33% { transform: translate(60px,-80px) scale(1.1); } 66% { transform: translate(-40px,50px) scale(0.9); } 100% { transform: translate(0,0) scale(1); } }
+    .particle { position: fixed; width: 3px; height: 3px; border-radius: 50%; pointer-events: none; z-index: 1; animation: particleFly linear infinite; }
+    @keyframes particleFly { 0% { opacity: 0; transform: translateY(0) rotate(0deg); } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; transform: translateY(-100vh) rotate(720deg); } }
+    .wrapper { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 80px; }
+    nav { width: 100%; max-width: 1100px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 60px; padding: 16px 28px; background: var(--glass); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; backdrop-filter: blur(12px); }
+    .logo { font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 1.45rem; letter-spacing: -0.5px; display: inline-block; }
+    .logo .g { color: var(--c1); } .logo .li { color: var(--c2); } .logo .tchi { color: var(--c3); } .logo .share { color: #fff; margin-left: 6px; font-weight: 400; font-size: 1rem; opacity: 0.7; }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 0.88rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--c2); }
+    .hero { text-align: center; margin-bottom: 48px; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border: 1px solid rgba(0,245,212,0.3); border-radius: 999px; font-size: 0.78rem; color: var(--c2); font-weight: 600; margin-bottom: 20px; animation: badgePulse 2s ease-in-out infinite; }
+    @keyframes badgePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(0,245,212,0.3); } 50% { box-shadow: 0 0 0 6px rgba(0,245,212,0); } }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c2); animation: blink 1.2s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+    .hero h1 { font-family: 'Unbounded', sans-serif; font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 900; line-height: 1.08; letter-spacing: -1.5px; margin-bottom: 16px; }
+    .hero h1 .hl1 { background: linear-gradient(90deg, var(--c1), var(--c6)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero h1 .hl2 { background: linear-gradient(90deg, var(--c2), var(--c5)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { color: rgba(255,255,255,0.5); font-size: 1.05rem; max-width: 520px; margin: 0 auto; }
+    .drop-zone-wrap { width: 100%; max-width: 780px; margin-bottom: 36px; }
+    .drop-zone { position: relative; border-radius: 28px; padding: 64px 40px; text-align: center; background: var(--dark2); transition: transform 0.3s ease; }
+    .drop-zone::before { content: ''; position: absolute; inset: -2px; border-radius: 30px; padding: 2px; background: linear-gradient(var(--angle,0deg), var(--c1), var(--c3), var(--c2), var(--c5), var(--c4), var(--c6), var(--c1)); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: rotateBorder 3s linear infinite; z-index: 0; }
+    @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    @keyframes rotateBorder { to { --angle: 360deg; } }
+    .drop-inner { position: relative; z-index: 1; }
+    .upload-icon { width: 90px; height: 90px; border-radius: 24px; background: linear-gradient(135deg, rgba(255,45,120,0.15), rgba(155,93,229,0.15)); border: 1.5px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; animation: iconFloat 3s ease-in-out infinite; }
+    @keyframes iconFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .upload-icon svg { width: 42px; height: 42px; stroke: var(--c2); filter: drop-shadow(0 0 12px var(--c2)); }
+    .icon-ring { position: absolute; inset: -8px; border-radius: 32px; border: 1px dashed rgba(0,245,212,0.3); animation: spinRing 8s linear infinite; }
+    @keyframes spinRing { to { transform: rotate(360deg); } }
+    .icon-ring2 { position: absolute; inset: -18px; border-radius: 42px; border: 1px dashed rgba(255,45,120,0.2); animation: spinRing 12s linear infinite reverse; }
+    .drop-zone h2 { font-family: 'Unbounded', sans-serif; font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+    .drop-zone p { color: rgba(255,255,255,0.45); font-size: 0.92rem; margin-bottom: 28px; }
+    .drop-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 10; }
+    .btn-primary { padding: 13px 32px; border-radius: 14px; border: none; font-weight: 700; font-size: 0.95rem; cursor: pointer; background: linear-gradient(135deg, var(--c1), var(--c4)); color: #fff; transition: transform 0.2s; }
+    .btn-primary:hover { transform: translateY(-3px); }
+    .btn-secondary { padding: 13px 32px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.15); font-weight: 600; cursor: pointer; background: var(--glass); color: rgba(255,255,255,0.8); }
+    .btn-secondary:hover { border-color: var(--c2); color: var(--c2); transform: translateY(-3px); }
+    .formats { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+    .format-tag { padding: 4px 12px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; }
+    .room-info { background: var(--dark3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 16px 24px; margin-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: relative; z-index: 20; }
+    .room-link { font-family: monospace; font-size: 0.9rem; background: #00000040; padding: 8px 14px; border-radius: 40px; word-break: break-all; flex: 1; color: #00f5d4; text-align: left; max-width: 100%; overflow-wrap: break-word; }
+    .copy-link-btn { background: var(--c2); color: #000; border: none; padding: 10px 22px; border-radius: 40px; font-weight: bold; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+    .copy-link-btn:hover { background: #fff; transform: scale(1.03); }
+    .upload-file-item { background: var(--glass2); border-radius: 16px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; margin-top: 16px; text-align: left; }
+    .file-info { flex: 1; }
+    .progress-bar-wrap { height: 4px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+    .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--c2), var(--c5)); transition: width 0.2s; }
+    .check-icon { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #00f5d4, #00bbf9); display: flex; align-items: center; justify-content: center; transition: transform 0.3s; }
+    .check-icon.done { animation: donePulse 0.5s ease; }
+    @keyframes donePulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    .status-text { margin-top: 12px; font-weight: 500; background: rgba(0,0,0,0.5); display: inline-block; padding: 6px 16px; border-radius: 40px; font-size: 0.85rem; }
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--dark3); border: 1px solid rgba(0,245,212,0.3); border-radius: 14px; padding: 14px 24px; color: var(--c2); z-index: 99999; opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; pointer-events: none; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    footer { text-align: center; color: rgba(255,255,255,0.25); font-size: 0.78rem; margin-top: 40px; }
+    footer span { color: var(--c1); }
+    #file-input { display: none; }
+    .divider-text { align-self: center; color: rgba(255,255,255,0.4); }
+  </style>
+</head>
+<body>
+<div class="toast" id="toast">✓ Link copied!</div>
+<div class="bg-canvas" id="bgCanvas"></div>
+<script>
+  // --- Background particles & orbs (same as before) ---
+  const pColors = ['#ff2d78','#00f5d4','#ffe600','#9b5de5','#00bbf9','#f15bb5'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('div'); p.className = 'particle';
+    const c = pColors[Math.floor(Math.random() * pColors.length)];
+    const size = Math.random() * 4 + 2;
+    Object.assign(p.style, { left: Math.random() * 100 + 'vw', top: Math.random() * 100 + 'vh', width: size + 'px', height: size + 'px', background: c, boxShadow: `0 0 ${size*3}px ${c}`, animationDuration: (Math.random() * 15 + 10) + 's', animationDelay: (Math.random() * 12) + 's', opacity: 0 });
+    document.body.appendChild(p);
+  }
+  const orbData = [
+    { w: 500, h: 500, l: '10%', t: '5%', color: 'rgba(255,45,120,0.28)', dur: '18s' },
+    { w: 400, h: 400, l: '55%', t: '10%', color: 'rgba(0,245,212,0.22)', dur: '24s' },
+    { w: 350, h: 350, l: '80%', t: '50%', color: 'rgba(155,93,229,0.25)', dur: '20s' },
+    { w: 450, h: 450, l: '20%', t: '60%', color: 'rgba(0,187,249,0.18)', dur: '28s' },
+    { w: 280, h: 280, l: '50%', t: '80%', color: 'rgba(255,230,0,0.16)', dur: '16s' },
+  ];
+  const bgCanvas = document.getElementById('bgCanvas');
+  orbData.forEach((o,i) => { const d = document.createElement('div'); d.className = 'orb'; Object.assign(d.style, { width: o.w+'px', height: o.h+'px', left: o.l, top: o.t, background: o.color, animationDuration: o.dur, animationDelay: (i*3.5)+'s' }); bgCanvas.appendChild(d); });
+</script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<div class="wrapper">
+  <nav>
+    <div class="logo"><span class="g">G</span><span class="li">li</span><span class="tchi">tchi</span><span class="share">Share</span></div>
+    <div class="nav-links"><a href="#">Features</a><a href="#">Pricing</a><a href="/receiver.html">Receive File</a></div>
+  </nav>
+  <div class="hero">
+    <div class="hero-badge"><div class="badge-dot"></div> Send Files – No Middleman</div>
+    <h1><span class="hl1">Share</span> <span class="hl2">Instantly.</span></h1>
+    <p>Select a file → get a secure link → receiver downloads directly.</p>
+  </div>
+  <div class="drop-zone-wrap">
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-inner" id="dropInner">
+        <div class="upload-icon"><div class="icon-ring"></div><div class="icon-ring2"></div><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/><polyline points="16 8 12 4 8 8"/><line x1="12" y1="4" x2="12" y2="16"/></svg></div>
+        <h2>Drag & drop your file</h2>
+        <p>Supports any file size or type directly peer-to-peer</p>
+        <div class="drop-actions">
+          <button class="btn-primary" id="chooseFileBtn">📁 Choose File</button>
+          <span class="divider-text">or</span>
+          <button class="btn-secondary" id="pasteBtn">📋 Paste from Clipboard</button>
+        </div>
+        <div class="formats"><span class="format-tag" style="background:rgba(255,45,120,0.15);color:var(--c1);">PDF</span><span class="format-tag" style="background:rgba(0,245,212,0.12);color:var(--c2);">MP4</span><span class="format-tag" style="background:rgba(255,230,0,0.12);color:var(--c3);">ZIP</span></div>
+      </div>
+      <div id="progress-area"></div>
+      <div id="connectionStatus" class="status-text"></div>
+    </div>
+  </div>
+  <footer>Made with <span>♥</span> by Glitchi · P2P WebRTC</footer>
+</div>
+<input type="file" id="file-input">
+
+<script>
+  // --- Firebase signaling logic ---
+  const db = firebase.database();
+  let roomId, selectedFile = null;
+  let peerConnection, dataChannel;
+  let currentProgressItem = null;
+  const CHUNK_SIZE = 16384;
+  const STUN_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+  const toastEl = document.getElementById('toast');
+
+  function showToast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(() => toastEl.classList.remove('show'), 2500); }
+  function updateStatus(text) { document.getElementById('connectionStatus').innerHTML = text; }
+
+  function generateRoomId() { return Math.random().toString(36).substring(2, 10).toUpperCase(); }
+
+  // --- Copy with fallback ---
+  function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => showToast('✓ Link copied! Send to receiver.')).catch(() => fallbackCopy(text));
+    } else {
+      fallbackCopy(text);
+    }
+  }
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed'; textarea.style.top = '-9999px'; textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showToast('✓ Link copied!');
+    } catch (err) {
+      showToast('📋 Please copy the link manually: ' + text);
+    }
+    document.body.removeChild(textarea);
+  }
+
+  // --- WebRTC PeerConnection ---
+  function initPeerConnection() {
+    peerConnection = new RTCPeerConnection(STUN_SERVERS);
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        db.ref('rooms/' + roomId + '/candidateSender').set(event.candidate);
+      }
+    };
+    peerConnection.onconnectionstatechange = () => {
+      if (peerConnection.connectionState === 'connected') {
+        updateStatus('✅ Connected! Sending file...');
+        if (selectedFile) sendFile(selectedFile);
+      } else if (peerConnection.connectionState === 'failed') {
+        updateStatus('❌ Connection failed');
+      }
+    };
+    dataChannel = peerConnection.createDataChannel('fileTransfer');
+    dataChannel.binaryType = 'arraybuffer';
+    dataChannel.onopen = () => updateStatus('🔗 Peer connected, sending...');
+    dataChannel.onclose = () => updateStatus('❌ Connection closed');
+    dataChannel.onerror = (err) => { console.error(err); updateStatus('❌ Transfer error'); };
+    return peerConnection;
+  }
+
+  // --- Send file with chunking ---
+  function sendFile(file) {
+    if (!dataChannel || dataChannel.readyState !== 'open') {
+      setTimeout(() => sendFile(file), 500);
+      return;
+    }
+    const metadata = JSON.stringify({ name: file.name, size: file.size, type: file.type });
+    dataChannel.send(metadata);
+    let offset = 0;
+    function sendNext() {
+      if (offset >= file.size) {
+        updateStatus('✅ File sent!');
+        if (currentProgressItem) currentProgressItem.querySelector('.check-icon').classList.add('done');
+        // Clean up room after a delay
+        setTimeout(() => db.ref('rooms/' + roomId).remove(), 5000);
+        return;
+      }
+      const chunk = file.slice(offset, offset + CHUNK_SIZE);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        dataChannel.send(e.target.result);
+        offset += CHUNK_SIZE;
+        const percent = (offset / file.size) * 100;
+        if (currentProgressItem) currentProgressItem.querySelector('.progress-bar').style.width = percent + '%';
+        sendNext();
+      };
+      reader.readAsArrayBuffer(chunk);
+    }
+    sendNext();
+  }
+
+  // --- UI: show file item ---
+  function showProgressItem(name, size) {
+    const sizeStr = size < 1024*1024 ? (size/1024).toFixed(1)+' KB' : (size/1024/1024).toFixed(1)+' MB';
+    const item = document.createElement('div');
+    item.className = 'upload-file-item';
+    item.innerHTML = `<div class="file-icon" style="background:#ff2d7822;font-size:1.4rem;">📁</div><div class="file-info"><div class="file-name">${name}</div><div class="file-size">${sizeStr}</div><div class="progress-bar-wrap"><div class="progress-bar" style="width:0%"></div></div></div><div class="check-icon">✓</div>`;
+    document.getElementById('progress-area').innerHTML = '';
+    document.getElementById('progress-area').appendChild(item);
+    currentProgressItem = item;
+  }
+
+  // --- Main: start as sender ---
+  async function startAsSender(file) {
+    selectedFile = file;
+    roomId = generateRoomId();
+    const receiverUrl = `${window.location.origin}/receiver.html?room=${encodeURIComponent(roomId)}`;
+    showProgressItem(file.name, file.size);
+    updateStatus(`Room created. Share this link:`);
+
+    // Build room info UI
+    const roomDiv = document.createElement('div');
+    roomDiv.className = 'room-info';
+    const linkSpan = document.createElement('span');
+    linkSpan.className = 'room-link';
+    linkSpan.textContent = receiverUrl;
+    roomDiv.appendChild(linkSpan);
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-link-btn';
+    copyBtn.textContent = 'Copy Link';
+    copyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      copyToClipboard(receiverUrl);
+    });
+    roomDiv.appendChild(copyBtn);
+    document.getElementById('progress-area').appendChild(roomDiv);
+
+    // Set up Firebase listeners for this room
+    const roomRef = db.ref('rooms/' + roomId);
+    // Clear any old data
+    await roomRef.remove();
+
+    // Wait for receiver to join (indicated by "receiverReady" flag)
+    roomRef.child('receiverReady').on('value', async (snap) => {
+      if (snap.val() === true) {
+        updateStatus('Peer joined, establishing...');
+        const pc = initPeerConnection();
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        roomRef.child('offer').set(offer);
+      }
+    });
+
+    // Listen for answer
+    roomRef.child('answer').on('value', async (snap) => {
+      const answer = snap.val();
+      if (answer && peerConnection && !peerConnection.currentRemoteDescription) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    });
+
+    // Listen for ICE candidates from receiver
+    roomRef.child('candidateReceiver').on('value', async (snap) => {
+      const candidate = snap.val();
+      if (candidate && peerConnection) {
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+      }
+    });
+
+    // Cleanup when done
+    roomRef.onDisconnect().remove();
+  }
+
+  // --- Event listeners for file selection ---
+  document.getElementById('chooseFileBtn').onclick = (e) => {
+    e.stopPropagation();
+    document.getElementById('file-input').click();
+  };
+  document.getElementById('file-input').onchange = (e) => {
+    if (e.target.files.length) startAsSender(e.target.files[0]);
+  };
+
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragging');
+    if (e.dataTransfer.files.length) startAsSender(e.dataTransfer.files[0]);
+  });
+
+  document.getElementById('pasteBtn').onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            const file = new File([blob], 'clipboard-image.' + type.split('/')[1], { type });
+            startAsSender(file);
+            return;
+          }
+        }
+      }
+      showToast('No image in clipboard');
+    } catch(e) { showToast('Clipboard access denied'); }
+  };
+
+  // --- Initial UI state ---
+  updateStatus('Select a file to start');
+</script>
+</body>
+</html>

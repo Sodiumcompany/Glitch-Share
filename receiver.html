@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glitchi Share – Receive Files</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Unbounded:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    /* --- same as sender, with identical fixes --- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --c1: #ff2d78; --c2: #00f5d4; --c3: #ffe600; --c4: #9b5de5;
+      --c5: #00bbf9; --c6: #f15bb5; --dark: #0a0a0f; --dark2: #12121e;
+      --dark3: #1c1c2e; --glass: rgba(255,255,255,0.05); --glass2: rgba(255,255,255,0.08);
+    }
+    body { font-family: 'Space Grotesk', sans-serif; background: var(--dark); color: #fff; min-height: 100vh; overflow-x: hidden; }
+    .bg-canvas { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(80px); animation: floatOrb linear infinite; opacity: 0.35; }
+    @keyframes floatOrb { 0% { transform: translate(0,0) scale(1); } 33% { transform: translate(60px,-80px) scale(1.1); } 66% { transform: translate(-40px,50px) scale(0.9); } 100% { transform: translate(0,0) scale(1); } }
+    .particle { position: fixed; width: 3px; height: 3px; border-radius: 50%; pointer-events: none; z-index: 1; animation: particleFly linear infinite; }
+    @keyframes particleFly { 0% { opacity: 0; transform: translateY(0) rotate(0deg); } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; transform: translateY(-100vh) rotate(720deg); } }
+    .wrapper { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 80px; }
+    nav { width: 100%; max-width: 1100px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 60px; padding: 16px 28px; background: var(--glass); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; backdrop-filter: blur(12px); }
+    .logo { font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 1.45rem; letter-spacing: -0.5px; display: inline-block; }
+    .logo .g { color: var(--c1); } .logo .li { color: var(--c2); } .logo .tchi { color: var(--c3); } .logo .share { color: #fff; margin-left: 6px; font-weight: 400; font-size: 1rem; opacity: 0.7; }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 0.88rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--c2); }
+    .hero { text-align: center; margin-bottom: 48px; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border: 1px solid rgba(0,245,212,0.3); border-radius: 999px; font-size: 0.78rem; color: var(--c2); font-weight: 600; margin-bottom: 20px; animation: badgePulse 2s ease-in-out infinite; }
+    @keyframes badgePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(0,245,212,0.3); } 50% { box-shadow: 0 0 0 6px rgba(0,245,212,0); } }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c2); animation: blink 1.2s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+    .hero h1 { font-family: 'Unbounded', sans-serif; font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 900; letter-spacing: -1.5px; margin-bottom: 16px; }
+    .hero h1 .hl1 { background: linear-gradient(90deg, var(--c1), var(--c6)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { color: rgba(255,255,255,0.5); font-size: 1.05rem; max-width: 520px; margin: 0 auto; }
+    .drop-zone-wrap { width: 100%; max-width: 780px; margin-bottom: 36px; }
+    .drop-zone { position: relative; border-radius: 28px; padding: 64px 40px; text-align: center; background: var(--dark2); transition: transform 0.3s ease; }
+    .drop-zone::before { content: ''; position: absolute; inset: -2px; border-radius: 30px; padding: 2px; background: linear-gradient(var(--angle,0deg), var(--c1), var(--c3), var(--c2), var(--c5), var(--c4), var(--c6), var(--c1)); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: rotateBorder 3s linear infinite; z-index: 0; }
+    @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    @keyframes rotateBorder { to { --angle: 360deg; } }
+    .upload-icon { width: 90px; height: 90px; border-radius: 24px; background: linear-gradient(135deg, rgba(255,45,120,0.15), rgba(155,93,229,0.15)); border: 1.5px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; animation: iconFloat 3s ease-in-out infinite; }
+    @keyframes iconFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .upload-icon svg { width: 42px; height: 42px; stroke: var(--c2); filter: drop-shadow(0 0 12px var(--c2)); }
+    .icon-ring { position: absolute; inset: -8px; border-radius: 32px; border: 1px dashed rgba(0,245,212,0.3); animation: spinRing 8s linear infinite; }
+    @keyframes spinRing { to { transform: rotate(360deg); } }
+    .icon-ring2 { position: absolute; inset: -18px; border-radius: 42px; border: 1px dashed rgba(255,45,120,0.2); animation: spinRing 12s linear infinite reverse; }
+    .drop-zone h2 { font-family: 'Unbounded', sans-serif; font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+    .drop-zone p { color: rgba(255,255,255,0.45); font-size: 0.92rem; margin-bottom: 28px; }
+    .upload-file-item { background: var(--glass2); border-radius: 16px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; margin-top: 16px; text-align: left; }
+    .file-info { flex: 1; }
+    .progress-bar-wrap { height: 4px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+    .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--c2), var(--c5)); transition: width 0.2s; }
+    .check-icon { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #00f5d4, #00bbf9); display: flex; align-items: center; justify-content: center; transition: transform 0.3s; }
+    .check-icon.done { animation: donePulse 0.5s ease; }
+    @keyframes donePulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    .status-text { margin-top: 12px; font-weight: 500; background: rgba(0,0,0,0.5); display: inline-block; padding: 6px 16px; border-radius: 40px; font-size: 0.85rem; }
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--dark3); border: 1px solid rgba(0,245,212,0.3); border-radius: 14px; padding: 14px 24px; color: var(--c2); z-index: 99999; opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; pointer-events: none; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    footer { text-align: center; color: rgba(255,255,255,0.25); font-size: 0.78rem; margin-top: 40px; }
+    footer span { color: var(--c1); }
+    .file-icon { font-size: 1.4rem; background: #00f5d422; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+<div class="toast" id="toast">✓ Ready</div>
+<div class="bg-canvas" id="bgCanvas"></div>
+<script>
+  // --- Background particles (same) ---
+  const pColors = ['#ff2d78','#00f5d4','#ffe600','#9b5de5','#00bbf9','#f15bb5'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('div'); p.className = 'particle';
+    const c = pColors[Math.floor(Math.random() * pColors.length)];
+    const size = Math.random() * 4 + 2;
+    Object.assign(p.style, { left: Math.random() * 100 + 'vw', top: Math.random() * 100 + 'vh', width: size + 'px', height: size + 'px', background: c, boxShadow: `0 0 ${size*3}px ${c}`, animationDuration: (Math.random() * 15 + 10) + 's', animationDelay: (Math.random() * 12) + 's', opacity: 0 });
+    document.body.appendChild(p);
+  }
+  const orbData = [
+    { w: 500, h: 500, l: '10%', t: '5%', color: 'rgba(255,45,120,0.28)', dur: '18s' },
+    { w: 400, h: 400, l: '55%', t: '10%', color: 'rgba(0,245,212,0.22)', dur: '24s' },
+    { w: 350, h: 350, l: '80%', t: '50%', color: 'rgba(155,93,229,0.25)', dur: '20s' },
+    { w: 450, h: 450, l: '20%', t: '60%', color: 'rgba(0,187,249,0.18)', dur: '28s' },
+    { w: 280, h: 280, l: '50%', t: '80%', color: 'rgba(255,230,0,0.16)', dur: '16s' },
+  ];
+  const bgCanvas = document.getElementById('bgCanvas');
+  orbData.forEach((o,i) => { const d = document.createElement('div'); d.className = 'orb'; Object.assign(d.style, { width: o.w+'px', height: o.h+'px', left: o.l, top: o.t, background: o.color, animationDuration: o.dur, animationDelay: (i*3.5)+'s' }); bgCanvas.appendChild(d); });
+</script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<div class="wrapper">
+  <nav>
+    <div class="logo"><span class="g">G</span><span class="li">li</span><span class="tchi">tchi</span><span class="share">Share</span></div>
+    <div class="nav-links"><a href="#">Features</a><a href="#">Pricing</a><a href="/sender.html">Send File</a></div>
+  </nav>
+  <div class="hero">
+    <div class="hero-badge"><div class="badge-dot"></div> Receive Files – Direct P2P</div>
+    <h1><span class="hl1">Get</span> Your File.</h1>
+    <p>Waiting for sender to connect. No upload needed – file comes straight to you.</p>
+  </div>
+  <div class="drop-zone-wrap">
+    <div class="drop-zone">
+      <div class="upload-icon"><div class="icon-ring"></div><div class="icon-ring2"></div><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/><polyline points="16 8 12 4 8 8"/><line x1="12" y1="4" x2="12" y2="16"/></svg></div>
+      <h2>Ready to receive</h2>
+      <p id="waitingText">⏳ Waiting for sender...</p>
+      <div id="progress-area"></div>
+      <div id="status" class="status-text"></div>
+    </div>
+  </div>
+  <footer>Made with <span>♥</span> by Glitchi · Files go directly to you</footer>
+</div>
+
+<script>
+  // --- Firebase signaling ---
+  const db = firebase.database();
+  let peerConnection, dataChannel;
+  let fileMetadata = null, expectedFileSize = 0, receivingFile = false;
+  let currentProgressItem = null;
+  let writableStream = null, fileHandle = null;
+  let receivedBytes = 0;
+  const toastEl = document.getElementById('toast');
+
+  function showToast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(() => toastEl.classList.remove('show'), 2500); }
+  function updateStatus(text) { document.getElementById('status').innerHTML = text; }
+
+  // --- Check for File System Access API support ---
+  const supportsFileSystem = 'showSaveFilePicker' in window;
+
+  // --- Show progress item ---
+  function showProgressItem(name, size) {
+    const sizeStr = size < 1024*1024 ? (size/1024).toFixed(1)+' KB' : (size/1024/1024).toFixed(1)+' MB';
+    const item = document.createElement('div');
+    item.className = 'upload-file-item';
+    item.innerHTML = `<div class="file-icon">📥</div><div class="file-info"><div class="file-name">${name}</div><div class="file-size">${sizeStr}</div><div class="progress-bar-wrap"><div class="progress-bar" style="width:0%"></div></div></div><div class="check-icon">✓</div>`;
+    document.getElementById('progress-area').innerHTML = '';
+    document.getElementById('progress-area').appendChild(item);
+    currentProgressItem = item;
+  }
+
+  // --- Initialize PeerConnection for receiver ---
+  function initPeerConnection() {
+    peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] });
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        db.ref('rooms/' + roomId + '/candidateReceiver').set(event.candidate);
+      }
+    };
+    peerConnection.onconnectionstatechange = () => {
+      if (peerConnection.connectionState === 'connected') updateStatus('✅ Connected! Waiting for file...');
+      else if (peerConnection.connectionState === 'failed') updateStatus('❌ Connection failed');
+    };
+    peerConnection.ondatachannel = (event) => {
+      dataChannel = event.channel;
+      dataChannel.binaryType = 'arraybuffer';
+      dataChannel.onmessage = handleDataChannelMessage;
+      dataChannel.onclose = () => { updateStatus('❌ Connection closed'); };
+      dataChannel.onerror = (err) => { console.error(err); updateStatus('❌ Transfer error'); };
+    };
+    return peerConnection;
+  }
+
+  // --- Handle incoming data chunks ---
+  async function handleDataChannelMessage(event) {
+    if (typeof event.data === 'string') {
+      try {
+        const meta = JSON.parse(event.data);
+        if (meta.name && meta.size) {
+          fileMetadata = meta;
+          expectedFileSize = meta.size;
+          receivedBytes = 0;
+          receivingFile = true;
+          updateStatus(`📥 Receiving ${meta.name}...`);
+          showProgressItem(meta.name, meta.size);
+
+          // If File System API is supported, ask user for save location
+          if (supportsFileSystem) {
+            try {
+              fileHandle = await window.showSaveFilePicker({
+                suggestedName: meta.name,
+                types: [{ description: 'File', accept: { 'application/octet-stream': ['.' + meta.name.split('.').pop()] } }]
+              });
+              writableStream = await fileHandle.createWritable();
+              // Write metadata? not needed, just chunks
+            } catch (err) {
+              // User cancelled or error - fall back to memory
+              showToast('Save picker cancelled, using in-memory fallback');
+              fileHandle = null;
+              writableStream = null;
+            }
+          }
+          return;
+        }
+      } catch(e) {}
+    }
+
+    if (receivingFile && event.data instanceof ArrayBuffer) {
+      const chunk = event.data;
+      receivedBytes += chunk.byteLength;
+
+      // Write to stream if available, else accumulate
+      if (writableStream) {
+        try {
+          await writableStream.write(new Uint8Array(chunk));
+        } catch (err) {
+          console.error('Write error:', err);
+          // fallback to memory
+          writableStream = null;
+          // accumulate chunks in an array (re-initialize)
+          if (!window._chunks) window._chunks = [];
+          window._chunks.push(chunk);
+        }
+      } else {
+        // Accumulate in memory
+        if (!window._chunks) window._chunks = [];
+        window._chunks.push(chunk);
+      }
+
+      // Update progress
+      const percent = (receivedBytes / expectedFileSize) * 100;
+      if (currentProgressItem) currentProgressItem.querySelector('.progress-bar').style.width = percent + '%';
+
+      // Check if complete
+      if (receivedBytes >= expectedFileSize) {
+        receivingFile = false;
+        // Close writable stream if open
+        if (writableStream) {
+          await writableStream.close();
+          writableStream = null;
+          fileHandle = null;
+          updateStatus(`✅ File saved as ${fileMetadata.name}`);
+          if (currentProgressItem) currentProgressItem.querySelector('.check-icon').classList.add('done');
+          showToast('Download complete!');
+        } else {
+          // Fallback: create blob and download
+          const chunks = window._chunks || [];
+          const blob = new Blob(chunks, { type: fileMetadata.type || 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileMetadata.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          updateStatus(`✅ File saved as ${fileMetadata.name}`);
+          if (currentProgressItem) currentProgressItem.querySelector('.check-icon').classList.add('done');
+          showToast('Download complete!');
+          window._chunks = [];
+        }
+        fileMetadata = null;
+        currentProgressItem = null;
+        // Cleanup room
+        setTimeout(() => db.ref('rooms/' + roomId).remove(), 3000);
+      }
+    }
+  }
+
+  // --- Get room ID from URL ---
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomId = urlParams.get('room');
+  if (!roomId) {
+    document.getElementById('waitingText').innerHTML = '❌ No room ID provided. Go back and use the link from sender.';
+  } else {
+    document.getElementById('waitingText').innerHTML = `🔗 Room ${roomId} – waiting for sender...`;
+
+    // Set up Firebase listeners
+    const roomRef = db.ref('rooms/' + roomId);
+    // Signal that receiver is ready
+    roomRef.child('receiverReady').set(true);
+
+    // Listen for offer
+    roomRef.child('offer').on('value', async (snap) => {
+      const offer = snap.val();
+      if (offer && !peerConnection) {
+        const pc = initPeerConnection();
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        roomRef.child('answer').set(answer);
+      }
+    });
+
+    // Listen for ICE candidates from sender
+    roomRef.child('candidateSender').on('value', async (snap) => {
+      const candidate = snap.val();
+      if (candidate && peerConnection) {
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+      }
+    });
+
+    // Cleanup when disconnected
+    roomRef.onDisconnect().remove();
+    // Also remove receiverReady flag on disconnect (but we set it true above)
+    roomRef.child('receiverReady').onDisconnect().remove();
+
+    updateStatus('⏳ Waiting for sender to connect...');
+  }
+</script>
+</body>
+</html>
