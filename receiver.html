@@ -62,8 +62,6 @@
     footer span { color: var(--c1); }
     .file-icon { font-size: 1.4rem; background: #00f5d422; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
     .error-box { background: rgba(255,45,120,0.15); border: 1px solid rgba(255,45,120,0.3); padding: 16px; border-radius: 12px; margin-top: 24px; }
-    .debug-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--c2); background: transparent; color: var(--c2); font-size: 0.8rem; cursor: pointer; margin-top: 12px; }
-    .debug-btn:hover { background: rgba(0,245,212,0.1); }
   </style>
 </head>
 <body>
@@ -97,7 +95,7 @@
 <div class="wrapper">
   <nav>
     <div class="logo"><span class="g">G</span><span class="li">li</span><span class="tchi">tchi</span><span class="share">Share</span></div>
-    <div class="nav-links"><a href="/index.html">→ Send File</a></div>
+    <div class="nav-links"><a href="/sender.html">→ Send File</a></div>
   </nav>
   <div class="hero">
     <div class="hero-badge"><div class="badge-dot"></div> Receive Files – Direct P2P</div>
@@ -111,7 +109,6 @@
       <p id="waitingText">⏳ Waiting for sender...</p>
       <div id="progress-area"></div>
       <div id="status" class="status-text"></div>
-      <button class="debug-btn" onclick="openDebugConsole()">🐛 Open Debug Console</button>
     </div>
   </div>
   <footer>Made with <span>♥</span> by Glitchi · Files go directly to you</footer>
@@ -128,16 +125,6 @@
   const toastEl = document.getElementById('toast');
   const fileChunks = [];
 
-  // DEBUG
-  function log(msg) {
-    console.log('[RECEIVER]', msg);
-  }
-
-  function openDebugConsole() {
-    log('Opening Debug Console');
-    alert('Open browser Developer Tools: Press F12 and check Console tab for detailed logs');
-  }
-
   function showToast(msg) {
     toastEl.textContent = msg;
     toastEl.classList.add('show');
@@ -145,17 +132,12 @@
   }
 
   function updateStatus(text) {
-    log(text);
     document.getElementById('status').innerHTML = text;
   }
 
   function initPeerConnection() {
-    if (peerConnection) {
-      log('PeerConnection already exists');
-      return peerConnection;
-    }
+    if (peerConnection) return peerConnection;
 
-    log('Creating new PeerConnection...');
     const config = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -167,25 +149,20 @@
     };
 
     peerConnection = new RTCPeerConnection(config);
-    log('PeerConnection created');
 
     peerConnection.onicecandidate = (event) => {
       if (event.candidate && roomId) {
-        log('Sending ICE candidate to Firebase: ' + event.candidate.candidate.substring(0, 50));
         db.ref('rooms/' + roomId + '/candidateReceiver').set(event.candidate.toJSON());
-      } else if (!event.candidate) {
-        log('ICE gathering complete');
       }
     };
 
     peerConnection.ondatachannel = (event) => {
-      log('✅ Data channel received from sender!');
       dataChannel = event.channel;
       setupDataChannel();
     };
 
     peerConnection.onconnectionstatechange = () => {
-      log('Connection state: ' + peerConnection.connectionState);
+      console.log('Connection state:', peerConnection.connectionState);
       if (peerConnection.connectionState === 'failed') {
         updateStatus('❌ Connection failed. Ask sender to try again.');
         showToast('Connection failed');
@@ -194,36 +171,26 @@
       }
     };
 
-    peerConnection.oniceconnectionstatechange = () => {
-      log('ICE connection state: ' + peerConnection.iceConnectionState);
-    };
-
     return peerConnection;
   }
 
   function setupDataChannel() {
-    if (!dataChannel) {
-      log('ERROR: No data channel to setup');
-      return;
-    }
+    if (!dataChannel) return;
 
-    log('Setting up data channel...');
     dataChannel.binaryType = 'arraybuffer';
 
     dataChannel.onopen = () => {
-      log('✅ DATA CHANNEL OPENED!');
+      console.log('Data channel opened');
       updateStatus('📥 Connected! Ready to receive...');
       showToast('Connected!');
     };
 
     dataChannel.onmessage = async (event) => {
       try {
-        // First message is metadata (JSON string)
         if (typeof event.data === 'string') {
           try {
             const meta = JSON.parse(event.data);
             if (meta.type === 'metadata') {
-              log('Received metadata: ' + JSON.stringify(meta));
               fileMetadata = meta;
               expectedFileSize = meta.size;
               receivedBytes = 0;
@@ -233,19 +200,15 @@
               return;
             }
           } catch (parseErr) {
-            log('Not JSON, treating as file data');
+            console.log('Not JSON, treating as file data');
           }
         }
 
-        // Subsequent messages are file chunks (ArrayBuffer)
         if (event.data instanceof ArrayBuffer) {
           const chunk = event.data;
           fileChunks.push(chunk);
           receivedBytes += chunk.byteLength;
 
-          log('Received chunk: ' + chunk.byteLength + ' bytes (total: ' + receivedBytes + '/' + expectedFileSize + ')');
-
-          // Update progress
           if (expectedFileSize > 0) {
             const percent = (receivedBytes / expectedFileSize) * 100;
             if (currentProgressItem) {
@@ -254,42 +217,33 @@
             updateStatus(`📥 Receiving: ${percent.toFixed(1)}%`);
           }
 
-          // Check if complete
           if (receivedBytes >= expectedFileSize && expectedFileSize > 0) {
-            log('File transfer complete! Starting download...');
             completeFileReceive();
           }
         }
       } catch (err) {
-        log('Data channel message error: ' + err.message);
+        console.error('Data channel message error:', err);
       }
     };
 
     dataChannel.onerror = (error) => {
-      log('DATA CHANNEL ERROR: ' + error.message);
+      console.error('Data channel error:', error);
       updateStatus('❌ Connection error: ' + error.message);
       showToast('Connection error');
     };
 
     dataChannel.onclose = () => {
-      log('Data channel closed');
+      console.log('Data channel closed');
     };
   }
 
   function completeFileReceive() {
-    if (!fileMetadata || fileChunks.length === 0) {
-      log('ERROR: No file metadata or chunks');
-      return;
-    }
+    if (!fileMetadata || fileChunks.length === 0) return;
 
     try {
-      log('Creating blob from ' + fileChunks.length + ' chunks...');
       const blob = new Blob(fileChunks, { 
         type: fileMetadata.mimeType || 'application/octet-stream' 
       });
-
-      log('Blob size: ' + blob.size + ' bytes');
-      log('Starting download of ' + fileMetadata.name);
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -307,16 +261,13 @@
       }
       showToast('✓ Download complete!');
 
-      log('File downloaded successfully');
-
-      // Cleanup
       fileMetadata = null;
       fileChunks.length = 0;
       setTimeout(() => {
         db.ref('rooms/' + roomId).remove();
       }, 2000);
     } catch (err) {
-      log('ERROR saving file: ' + err.message);
+      console.error('File save error:', err);
       updateStatus('❌ Error saving file: ' + err.message);
       showToast('Failed to save file');
     }
@@ -341,80 +292,57 @@
     currentProgressItem = item;
   }
 
-  // Get room ID from URL
   const urlParams = new URLSearchParams(window.location.search);
   const roomId = urlParams.get('room');
 
-  log('=== RECEIVER PAGE LOADED ===');
-  log('Room ID from URL: ' + roomId);
-
   if (!roomId) {
-    log('ERROR: No room ID provided');
     document.getElementById('waitingText').innerHTML = '❌ No room ID provided. Get a link from the sender.';
     const errorBox = document.createElement('div');
     errorBox.className = 'error-box';
-    errorBox.innerHTML = '<strong>How to use:</strong><ol style="margin: 8px 0; padding-left: 20px;"><li>Ask sender to open sender page</li><li>Have sender select a file and share the link</li><li>Click the link to come here</li></ol>';
+    errorBox.innerHTML = '<strong>How to use:</strong><ol style="margin: 8px 0; padding-left: 20px;"><li>Ask sender to open Glitchi Share sender page</li><li>Have sender select a file and share the link</li><li>Click the link to come here</li></ol>';
     document.getElementById('progress-area').appendChild(errorBox);
   } else {
     document.getElementById('waitingText').innerHTML = `🔗 Room: <code style="background: #00000040; padding: 2px 6px; border-radius: 4px;">${roomId.substring(0, 8)}...</code>`;
     updateStatus('🔗 Connecting to sender...');
 
-    // Set up Firebase signaling
     const roomRef = db.ref('rooms/' + roomId);
 
-    log('Listening for sender offer...');
-
-    // Signal that receiver is ready
     roomRef.child('receiverReady').set(true);
-    log('Sent receiverReady: true');
 
-    // Listen for offer
     roomRef.child('offer').on('value', async (snap) => {
       const offer = snap.val();
-      log('offer event fired. Value: ' + (offer ? 'present' : 'null'));
-      
       if (offer && !peerConnection) {
         try {
-          log('Creating peer connection to receive offer...');
           const pc = initPeerConnection();
-          log('Setting remote description (offer)...');
           await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          log('Creating answer...');
           const answer = await pc.createAnswer();
-          log('Setting local description (answer)...');
           await pc.setLocalDescription(answer);
-          log('Sending answer to Firebase...');
-          await roomRef.child('answer').set(answer.toJSON());
-          log('Answer sent successfully');
+          
+          // FIX: Use the answer object directly, not answer.toJSON()
+          await roomRef.child('answer').set({
+            type: answer.type,
+            sdp: answer.sdp
+          });
         } catch (err) {
-          log('ERROR in offer handling: ' + err.message);
+          console.error('Offer error:', err);
           updateStatus('❌ Error: ' + err.message);
-        }
-      } else {
-        if (peerConnection) {
-          log('Peer connection already exists, ignoring new offer');
         }
       }
     });
 
-    // Listen for ICE candidates from sender
     roomRef.child('candidateSender').on('value', async (snap) => {
       const candidate = snap.val();
       if (candidate && peerConnection) {
         try {
-          log('Adding ICE candidate from sender...');
           await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (e) {
-          log('Warning: Could not add ICE candidate: ' + e.message);
+          console.error('ICE error:', e);
         }
       }
     });
 
-    // Cleanup on disconnect
     roomRef.onDisconnect().remove();
     roomRef.child('receiverReady').onDisconnect().remove();
-
-    log('Firebase listeners set up');
   }
 </script>
 </body>
