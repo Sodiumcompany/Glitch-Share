@@ -73,6 +73,8 @@
     footer { text-align: center; color: rgba(255,255,255,0.25); font-size: 0.78rem; margin-top: 40px; }
     footer span { color: var(--c1); }
     #file-input { display: none; }
+    .debug-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--c2); background: transparent; color: var(--c2); font-size: 0.8rem; cursor: pointer; margin-top: 12px; }
+    .debug-btn:hover { background: rgba(0,245,212,0.1); }
   </style>
 </head>
 <body>
@@ -128,6 +130,7 @@
   </div>
   <div id="progress-area"></div>
   <div id="status" class="status-text"></div>
+  <button class="debug-btn" onclick="openDebugConsole()">🐛 Open Debug Console</button>
   <footer>Made with <span>♥</span> by Glitchi · Direct P2P Transfer</footer>
 </div>
 
@@ -141,9 +144,23 @@
   let roomId = null;
   let currentProgressItem = null;
   const toastEl = document.getElementById('toast');
-  const CHUNK_SIZE = 16384; // 16KB chunks for better performance
+  const CHUNK_SIZE = 16384;
 
-  // Utility functions
+  // DEBUG: Log to console and UI
+  function log(msg) {
+    console.log('[SENDER]', msg);
+    const logs = document.getElementById('debug-logs');
+    if (logs) {
+      logs.innerHTML += msg + '<br>';
+      logs.scrollTop = logs.scrollHeight;
+    }
+  }
+
+  function openDebugConsole() {
+    log('Opening Debug Console');
+    alert('Open browser Developer Tools: Press F12 and check Console tab for detailed logs');
+  }
+
   function generateRoomId() {
     return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
   }
@@ -151,6 +168,7 @@
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
       showToast('✓ Link copied to clipboard!');
+      log('Link copied: ' + text);
     }).catch(err => {
       console.error('Copy failed:', err);
       showToast('❌ Failed to copy link');
@@ -164,13 +182,17 @@
   }
 
   function updateStatus(text) {
+    log(text);
     document.getElementById('status').innerHTML = text;
   }
 
-  // Initialize WebRTC peer connection
   function initPeerConnection() {
-    if (peerConnection) return peerConnection;
+    if (peerConnection) {
+      log('PeerConnection already exists');
+      return peerConnection;
+    }
 
+    log('Creating new PeerConnection...');
     const config = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -182,83 +204,95 @@
     };
 
     peerConnection = new RTCPeerConnection(config);
+    log('PeerConnection created');
 
-    // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
       if (event.candidate && roomId) {
+        log('Sending ICE candidate to Firebase: ' + event.candidate.candidate.substring(0, 50));
         db.ref('rooms/' + roomId + '/candidateSender').set(event.candidate.toJSON());
+      } else if (!event.candidate) {
+        log('ICE gathering complete');
       }
     };
 
     peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state:', peerConnection.connectionState);
+      log('Connection state: ' + peerConnection.connectionState);
       if (peerConnection.connectionState === 'failed') {
         updateStatus('❌ Connection failed. Try again.');
         showToast('Connection failed');
-      } else if (peerConnection.connectionState === 'disconnected') {
-        updateStatus('⚠️ Connection disconnected.');
+      } else if (peerConnection.connectionState === 'connected') {
+        updateStatus('✅ WebRTC Connected!');
       }
+    };
+
+    peerConnection.oniceconnectionstatechange = () => {
+      log('ICE connection state: ' + peerConnection.iceConnectionState);
     };
 
     return peerConnection;
   }
 
-  // Send file via data channel
   async function sendFile(file) {
     updateStatus('📤 Starting file transfer...');
+    log('Starting to send file: ' + file.name + ' (' + file.size + ' bytes)');
+    
     let bytesSent = 0;
-    const reader = new FileReader();
-    const chunks = [];
+    const totalSize = file.size;
+    let chunkIndex = 0;
 
-    // Split file into chunks
-    for (let i = 0; i < file.size; i += CHUNK_SIZE) {
-      chunks.push(file.slice(i, i + CHUNK_SIZE));
-    }
+    function sendNextChunk() {
+      if (!dataChannel || dataChannel.readyState !== 'open') {
+        log('ERROR: Data channel not open. State: ' + (dataChannel ? dataChannel.readyState : 'null'));
+        showToast('❌ Connection lost');
+        return;
+      }
 
-    reader.onload = async (e) => {
-      const chunk = e.target.result;
-      if (dataChannel && dataChannel.readyState === 'open') {
+      if (bytesSent >= totalSize) {
+        log('File transfer complete!');
+        updateStatus('✅ File sent successfully!');
+        if (currentProgressItem) {
+          currentProgressItem.querySelector('.check-icon').classList.add('done');
+        }
+        showToast('✓ File transfer complete!');
+        return;
+      }
+
+      const start = bytesSent;
+      const end = Math.min(bytesSent + CHUNK_SIZE, totalSize);
+      const blob = file.slice(start, end);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
         try {
-          dataChannel.send(chunk);
-          bytesSent += chunk.byteLength;
-          const percent = (bytesSent / file.size) * 100;
+          dataChannel.send(e.target.result);
+          bytesSent = end;
+          const percent = (bytesSent / totalSize) * 100;
+          
           if (currentProgressItem) {
             currentProgressItem.querySelector('.progress-bar').style.width = percent + '%';
           }
           updateStatus(`📤 Sending: ${percent.toFixed(1)}%`);
 
-          if (bytesSent >= file.size) {
-            updateStatus('✅ File sent successfully!');
-            if (currentProgressItem) {
-              currentProgressItem.querySelector('.check-icon').classList.add('done');
-            }
-            showToast('File transfer complete!');
-          }
+          // Send next chunk after a small delay to avoid buffer overflow
+          setTimeout(sendNextChunk, 10);
         } catch (err) {
-          console.error('Send error:', err);
+          log('ERROR sending chunk: ' + err.message);
           showToast('❌ Send error: ' + err.message);
         }
-      }
-    };
+      };
 
-    reader.onerror = () => {
-      console.error('Read error:', reader.error);
-      showToast('❌ File read error');
-      updateStatus('❌ Error reading file');
-    };
+      reader.onerror = () => {
+        log('ERROR reading file: ' + reader.error);
+        showToast('❌ File read error');
+      };
 
-    // Start reading chunks
-    let chunkIndex = 0;
-    const readNextChunk = () => {
-      if (chunkIndex < chunks.length) {
-        reader.readAsArrayBuffer(chunks[chunkIndex++]);
-      }
-    };
+      reader.readAsArrayBuffer(blob);
+    }
 
-    readNextChunk();
+    // Start sending chunks
+    sendNextChunk();
   }
 
-  // Show progress item
   function showProgressItem(name, size) {
     const sizeStr = size < 1024*1024 ? (size/1024).toFixed(1)+' KB' : (size/1024/1024).toFixed(1)+' MB';
     const item = document.createElement('div');
@@ -278,15 +312,70 @@
     currentProgressItem = item;
   }
 
-  // Main sender flow
+  function setupDataChannel() {
+    if (!dataChannel) {
+      log('ERROR: No data channel to setup');
+      return;
+    }
+
+    log('Setting up data channel...');
+    dataChannel.binaryType = 'arraybuffer';
+
+    dataChannel.onopen = () => {
+      log('✅ DATA CHANNEL OPENED!');
+      updateStatus('🚀 Connected! Sending metadata...');
+
+      // Send file metadata first
+      const metadata = {
+        type: 'metadata',
+        name: selectedFile.name,
+        size: selectedFile.size,
+        mimeType: selectedFile.type
+      };
+      
+      try {
+        const metaJson = JSON.stringify(metadata);
+        dataChannel.send(metaJson);
+        log('Sent metadata: ' + metaJson);
+        
+        // Send file after metadata
+        setTimeout(() => {
+          log('Starting file chunks...');
+          sendFile(selectedFile);
+        }, 100);
+      } catch (err) {
+        log('ERROR sending metadata: ' + err.message);
+      }
+    };
+
+    dataChannel.onerror = (error) => {
+      log('DATA CHANNEL ERROR: ' + error.message);
+      showToast('❌ Connection error');
+      updateStatus('❌ ' + error.message);
+    };
+
+    dataChannel.onclose = () => {
+      log('Data channel closed');
+    };
+
+    dataChannel.onmessage = (event) => {
+      log('Message from receiver: ' + event.data);
+    };
+  }
+
   async function startAsSender(file) {
-    if (file.size > 2 * 1024 * 1024 * 1024) { // 2GB limit
+    if (file.size > 2 * 1024 * 1024 * 1024) {
       showToast('❌ File too large (max 2GB)');
       return;
     }
 
+    log('=== STARTING SENDER ===');
+    log('File: ' + file.name + ' (' + file.size + ' bytes)');
+
     selectedFile = file;
     roomId = generateRoomId();
+    log('Generated room ID: ' + roomId);
+
     const receiverUrl = `${window.location.origin}/receiver.html?room=${encodeURIComponent(roomId)}`;
     
     showProgressItem(file.name, file.size);
@@ -312,21 +401,43 @@
 
     // Set up Firebase signaling
     const roomRef = db.ref('rooms/' + roomId);
-    await roomRef.remove();
+    
+    try {
+      await roomRef.remove();
+      log('Cleared old room data');
+    } catch (err) {
+      log('Warning: Could not clear room: ' + err.message);
+    }
 
     // Wait for receiver to connect
+    let receiverReadyListener = false;
     roomRef.child('receiverReady').on('value', async (snap) => {
-      if (snap.val() === true && !peerConnection) {
+      const isReady = snap.val();
+      log('receiverReady changed to: ' + isReady);
+      
+      if (isReady === true && !receiverReadyListener) {
+        receiverReadyListener = true;
+        log('Receiver is ready! Creating offer...');
         updateStatus('👥 Peer connected! Establishing connection...');
+        
         const pc = initPeerConnection();
         
         // Create data channel
+        log('Creating data channel...');
         dataChannel = pc.createDataChannel('fileTransfer', { ordered: true });
         setupDataChannel();
 
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        roomRef.child('offer').set(offer.toJSON());
+        try {
+          log('Creating WebRTC offer...');
+          const offer = await pc.createOffer();
+          log('Offer created, setting local description...');
+          await pc.setLocalDescription(offer);
+          log('Sending offer to Firebase...');
+          await roomRef.child('offer').set(offer.toJSON());
+          log('Offer sent to Firebase');
+        } catch (err) {
+          log('ERROR creating/sending offer: ' + err.message);
+        }
       }
     });
 
@@ -334,7 +445,13 @@
     roomRef.child('answer').on('value', async (snap) => {
       const answer = snap.val();
       if (answer && peerConnection && !peerConnection.currentRemoteDescription) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        try {
+          log('Received answer from Firebase, setting remote description...');
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+          log('Answer set successfully');
+        } catch (err) {
+          log('ERROR setting answer: ' + err.message);
+        }
       }
     });
 
@@ -343,51 +460,15 @@
       const candidate = snap.val();
       if (candidate && peerConnection) {
         try {
+          log('Adding ICE candidate from receiver...');
           await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (e) {
-          console.error('ICE error:', e);
+          log('Warning: Could not add ICE candidate: ' + e.message);
         }
       }
     });
 
-    // Cleanup on disconnect
     roomRef.onDisconnect().remove();
-  }
-
-  // Setup data channel
-  function setupDataChannel() {
-    if (!dataChannel) return;
-
-    dataChannel.onopen = () => {
-      console.log('Data channel opened');
-      updateStatus('🚀 Connected! Sending file...');
-      
-      // Send file metadata first
-      const metadata = {
-        type: 'metadata',
-        name: selectedFile.name,
-        size: selectedFile.size,
-        mimeType: selectedFile.type
-      };
-      dataChannel.send(JSON.stringify(metadata));
-      
-      // Then send file
-      setTimeout(() => sendFile(selectedFile), 100);
-    };
-
-    dataChannel.onerror = (error) => {
-      console.error('Data channel error:', error);
-      showToast('❌ Connection error');
-      updateStatus('❌ ' + error.message);
-    };
-
-    dataChannel.onclose = () => {
-      console.log('Data channel closed');
-    };
-
-    dataChannel.onmessage = (event) => {
-      console.log('Message from receiver:', event.data);
-    };
   }
 
   // Event listeners
@@ -434,6 +515,7 @@
     }
   };
 
+  log('Sender page loaded');
   updateStatus('📁 Select a file to start');
 </script>
 </body>
